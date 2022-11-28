@@ -1,0 +1,315 @@
+//Title: Compact model of Spin-Transfer-Torque(STT)-driven Perpendicular Magnetic Anistropy (PMA) MTJ with Spin-Hall assistance
+//Version: Beta.1.0
+//Date:25 April 2019
+//Language: VerilogA
+
+/*-------------------------------------------
+Property: IEF, UMR8622, Univ.Paris Sud-CNRS
+Authors: KailiZhang
+In this model, it takes into account the following mechanisms
+
+1.MTJ resistance calculation based on Brinkman model
+2.TMR dependence on the bias voltage
+3.Spin polarity calculation model for magnetic tunnel junction
+4.Dynamic model based on LandauLifshitzGilber (LLG) equation including STT and SHE torques
+---------------------------------------------*/
+`resetall
+`include "constants.vams"
+`include "disciplines.vams"
+
+`define rec 1
+`define ellip 2
+`define circle 3
+
+`define e 1.6e-19
+`define m 9.11e-31
+`define uB 9.274e-24
+`define u0 1.256637e-6
+`define hbas 1.054e-34	
+`define kB 1.38e-23
+
+module KEYWORD_model(T1,T2,T3,Tmz,Tx);
+
+inout T1,T2,T3;
+electrical T1,T2,T3;
+output Tmz,Tx;
+electrical Tmz;
+electrical Tx;
+
+
+parameter real  alpha=0.05;   
+parameter real  P=0.58;
+parameter real eta= 0.25; 											
+parameter real  Ki = 0.32e-3;	
+parameter real  Ms = 0.625e6;  
+parameter real PhiBas = 0.4;
+parameter real  Vh = 0.5;
+
+parameter integer  SHAPE=2  from[1:3];
+parameter real  tsl=1.1e-9 from[0.5e-9:3.0e-9];
+parameter real  a=50.0e-9;
+parameter real  b=50.0e-9;
+parameter real  r=25e-9;
+parameter real tox = 1.4e-9 from[0.8e-9:15e-9];
+parameter real  TMR=1 ;
+parameter real beta=85e-15 ;
+
+parameter real  d=3e-9;
+parameter real  l=60e-9;
+parameter real  w=50e-9;
+
+parameter integer PAP=0 from[0:1];
+parameter integer NON=0 from[0:1];
+parameter integer ESTT=0 from[0:1];
+parameter integer ESOT=1 from[0:1]; 
+
+parameter integer VNV  = 1 from[0:1];
+parameter integer ENE = 1 from[0:1];
+
+parameter real 	T= 300;
+parameter real 	RA=650e-12 from[500e-12:750e-12];
+parameter real   rho = 278e-8;
+
+parameter real sim_step = 1e-12;
+parameter integer RV=0 from[0:2];     
+parameter real DEV_tox=0.03;      
+parameter real DEV_tsl=0.03;        
+parameter real DEV_TMR=0.03;       
+
+real FA;			
+real gamma;		
+real surface;			
+real V12,V13,V23;		
+real Rp;  			
+real R_MTJ;		
+real R_W;  			
+real theta,phi;  		
+real delta_phi,delta_theta;	
+real delta_aver;                
+real V_MTJ;  		        
+real I_MTJ;                    
+real I_SOT;                    
+real ksi;			
+real J_STT;			
+real J_SOT;			
+real mz;			    
+real Hthermal;		
+real t_previous;		
+real Eb;                     
+real R_STT_FL_DL;           
+real R_SOT_FL_DL;          
+real t_DL_STT;              
+real t_FL_STT;
+real t_DL_SOT;
+real t_FL_SOT;
+real Heff;
+real Heff_p;
+real Heff_x;                 
+real Heff_y;                
+real Heff_z;               
+real Nx;                    
+real Ny;
+real Nz;
+real Hx;
+real Hy;
+real Hz;
+real v;
+real gammar;
+real sigma_x;
+real sigma_y;
+real sigma_z;
+real toxreal;
+real tslreal;
+real TMRreal;
+real I_SOT_C;      
+real V3_C1;      
+real V3_C2;     
+real ix;         
+real Id;           
+
+integer seed;             
+
+(*cds_inherited_parameter*)parameter real seedin = 0; 
+analog begin
+
+@(initial_step)begin
+
+seed=1000000000*seedin; 
+
+	if (SHAPE==1)
+		surface=a*b;		   
+	else if (SHAPE==2)
+		surface=`M_PI*a*b/4.0;	
+	else begin
+		surface=`M_PI*r*r;    	
+	end
+		
+	gamma = 2*`u0*`uB/`hbas;			         
+        gammar = gamma/(1+alpha*alpha);
+	if (RV==1)
+	   begin
+	    toxreal=$rdist_uniform(seed,(tox-tox*DEV_tox),(tox+tox*DEV_tox));
+        tslreal=$rdist_uniform(seed,(tsl-tsl*DEV_tsl),(tsl+tsl*DEV_tsl));
+	    TMRreal=$rdist_uniform(seed,(TMR-TMR*DEV_TMR),(TMR+TMR*DEV_TMR));	
+			
+		end
+	else if (RV==2)
+		begin
+			toxreal=abs($rdist_normal(seed,tox,tox*DEV_tox/3));
+			tslreal=abs($rdist_normal(seed,tsl,tsl*DEV_tsl/3));
+			TMRreal=abs($rdist_normal(seed,TMR,TMR*DEV_TMR/3));	
+		end
+	else	
+	  begin
+			toxreal= tox;
+			tslreal= tsl;
+			TMRreal= TMR;
+		end
+	
+	Heff = 2*Ki/(tslreal*Ms*`u0); 
+    v = `M_PI*r*r*tslreal;                    
+    delta_aver = sqrt(`kB*T/(`u0*Ms*Heff*v));             
+	Hthermal = sqrt(2*`kB*T*alpha/(`u0*Ms*gamma*v*sim_step));
+	
+	FA=(toxreal/(RA*sqrt(PhiBas)))*exp(2*sqrt(2*`m*`e*PhiBas)*toxreal/`hbas);
+	Rp=(toxreal/(FA*sqrt(PhiBas)*surface))*exp(2*sqrt(2*`m*`e*PhiBas)*toxreal/`hbas);
+
+	R_W = rho*l/(d*w); 
+	
+	
+	if (PAP==1) begin
+		theta = `M_PI-delta_aver;
+		phi = `M_PI;
+		mz = cos(theta);
+		end
+	else begin
+		theta = delta_aver;
+		phi = `M_PI;
+		mz = cos(theta);
+	end
+		
+	R_MTJ = Rp*(1+TMRreal/(TMRreal+2))/(1-TMRreal*mz/(TMRreal+2));
+		
+	Nx = `M_PI*tslreal/(8*r);
+	Ny = Nx;
+	Nz = 1-2*Nx ;
+	
+    Hx = 0;
+    Hy = -180*79.5775;
+    Hz = 0;
+	
+    R_STT_FL_DL = 0;
+	R_SOT_FL_DL = 0.7;
+	
+	t_previous = $realtime;
+
+    if (analysis("dc")) begin 
+       ix = PAP;
+       end
+
+end
+
+V_MTJ=R_MTJ*(4*V(T1)-2*V(T2)-2*V(T3))/(4*R_MTJ+R_W);
+I_MTJ = (4*V(T1)-2*V(T2)-2*V(T3))/(4*R_MTJ+R_W);
+I_SOT = (V(T2)-V(T3))/R_W;
+
+J_STT = I_MTJ/(`M_PI*r*r);
+
+J_SOT = I_SOT/(d*w);
+
+Heff_p = 2*Ki/(`u0*Ms*tslreal)-VNV*2*beta*V_MTJ/(`u0*Ms*tslreal*toxreal)-Nz*Ms;	
+
+V3_C1 = -0.07407*V(T1)+0.1055;
+V3_C2 = 0.06886*V(T1)-0.09798;
+
+if (analysis("dc"))begin
+    if (PAP==1) begin
+      R_MTJ = Rp*(1+TMRreal/(1+V_MTJ*V_MTJ/(Vh*Vh)));
+      if(V(T3)>0) begin
+        if (V(T3) > V3_C1) begin
+           ix = 0;
+           R_MTJ = Rp ; 
+           I_MTJ = (4*V(T1)-2*V(T2)-2*V(T3))/(4*R_MTJ+R_W);
+           theta = delta_aver;
+	 	  phi = `M_PI;
+		  mz = cos(theta);
+        end
+        else begin 
+           ix = 1;
+           R_MTJ = Rp*(1+TMRreal/(1+V_MTJ*V_MTJ/(Vh*Vh)));
+           I_MTJ = (4*V(T1)-2*V(T2)-2*V(T3))/(4*R_MTJ+R_W);
+       	theta = `M_PI-delta_aver;
+		phi = `M_PI;
+		mz = cos(theta);
+        end
+      end
+    end
+    else begin
+
+      if(V(T3)<0) begin
+        if (V(T3) < V3_C2) begin
+           ix = 1;
+           R_MTJ = Rp*(1+TMRreal/(1+V_MTJ*V_MTJ/(Vh*Vh)));
+           I_MTJ = (4*V(T1)-2*V(T2)-2*V(T3))/(4*R_MTJ+R_W);
+  		theta = `M_PI-delta_aver;
+		phi = `M_PI;
+		mz = cos(theta);
+        end
+        else begin
+           ix = 0;
+           R_MTJ = Rp ; 
+           I_MTJ = (4*V(T1)-2*V(T2)-2*V(T3))/(4*R_MTJ+R_W);
+           theta = delta_aver;
+	 	  phi = `M_PI;
+		  mz = cos(theta);
+        end
+      end
+    end
+
+    V(Tmz) <+ mz ;
+    I(T1,Tx) <+ I_MTJ;
+   I(T2,Tx) <+ (V(T2)-V(T3))/R_W-0.5*I_MTJ;
+   I(T3,Tx) <+ -((V(T2)-V(T3))/R_W+0.5*I_MTJ);  
+   
+end
+
+if (analysis("tran")) begin
+	
+        sigma_x = $rdist_normal(seed,0,1);
+        sigma_y = $rdist_normal(seed,0,1);
+        sigma_z = $rdist_normal(seed,0,1);
+    
+    	Heff_x = Hx-Nx*Ms*cos(phi)*sin(theta)+NON*sigma_x*Hthermal;
+	Heff_y = Hy*ENE-Ny*Ms*sin(phi)*sin(theta)+NON*sigma_y*Hthermal; 
+	Heff_z = Hz+Heff_p*cos(theta)+NON*sigma_z*Hthermal;
+	
+	t_DL_STT = ESTT*gamma*`hbas*P*J_STT/(2*`e*`u0*Ms*tslreal) ;
+	t_FL_STT = R_STT_FL_DL*t_DL_STT ;	
+	t_DL_SOT = ESOT*gamma*`hbas*eta*J_SOT/(2*`e*`u0*Ms*tslreal);
+	t_FL_SOT = R_SOT_FL_DL*t_DL_SOT;
+        
+    delta_theta = gammar*(Heff_x*(alpha*cos(theta)*cos(phi)-sin(phi))+Heff_y*(alpha*cos(theta)*sin(phi)+cos(phi))-Heff_z*alpha*sin(theta))+sin(theta)*(alpha*t_FL_STT-t_DL_STT)/(1+alpha*alpha)-t_DL_SOT*(alpha*sin(phi)+cos(theta)*cos(phi))/(1+alpha*alpha)+t_FL_SOT*(alpha*cos(theta)*cos(phi)-sin(phi))/(1+alpha*alpha);	
+    
+
+
+    delta_phi = gammar*(Heff_x*(-alpha*sin(phi)-cos(theta)*cos(phi))+Heff_y*(alpha*cos(phi)-cos(theta)*sin(phi))+Heff_z*sin(theta))/sin(theta)-(alpha*t_DL_STT+t_FL_STT)/(1+alpha*alpha)-(alpha*cos(theta)*cos(phi)-sin(phi))*t_DL_SOT/((1+alpha*alpha)*sin(theta))-(alpha*sin(phi)-cos(theta)*cos(phi))*t_FL_SOT/((1+alpha*alpha)*sin(theta));
+    
+	
+   phi = phi + delta_phi*($realtime-t_previous);
+   theta = theta + delta_theta*($realtime-t_previous);
+   t_previous = $realtime;
+   $bound_step(sim_step);
+
+   mz= cos(theta);
+   //R_MTJ = Rp*(1+TMRreal)/(1+0.5*(1+mz)*TMRreal);
+   R_MTJ = Rp*(1+V_MTJ*V_MTJ/(Vh*Vh)+TMRreal)/(1+V_MTJ*V_MTJ/(Vh*Vh)+0.5*(1+mz)*TMRreal);
+   I(T1,Tx) <+ I_MTJ;
+   I(T2,Tx) <+ (V(T2)-V(T3))/R_W-0.5*I_MTJ;
+   I(Tx,T3) <+ (V(T2)-V(T3))/R_W+0.5*I_MTJ; 
+   V(Tmz)<+ mz ;
+   V(Tx)<+ (0.5*R_W*V(T1)+R_MTJ*(V(T2)+V(T3)))/(2*R_MTJ+0.5*R_W);
+  end
+
+end
+endmodule
+

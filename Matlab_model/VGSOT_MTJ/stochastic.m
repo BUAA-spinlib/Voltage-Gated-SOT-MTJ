@@ -1,0 +1,9 @@
+function[sigma_x,sigma_y,sigma_z] = stochastic(n)
+sigma_x1 = normrnd(0,n,1,1);  %生成【-1，1】之间的高斯随机分布
+sigma_y1 = normrnd(0,n,1,1);
+sigma_z1 = normrnd(0,n,1,1);
+a = sigma_x1^2 +sigma_y1^2+sigma_z1^2;
+b = sqrt(a);
+sigma_x = sigma_x1/b;
+sigma_y = sigma_y1/b;
+sigma_z = sigma_z1/b;
