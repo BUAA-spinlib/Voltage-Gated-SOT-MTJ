@@ -1,0 +1,17 @@
+(envOpts analysisOrder) ("tran")
+(envOpts autoDisplay) t
+(envOpts cmd64bit) nil
+(envOpts cpfIsPommardEnabled) t
+(envOpts enableArclength) nil
+(envOpts firstRun) t
+(envOpts paramRangeCheckFile) ""
+(envOpts pllPlugin) ""
+(envOpts pllWizardinfo) ""
+(envOpts printComments) nil
+(envOpts restart) ""
+(envOpts savestate) ""
+(envOpts sst2usecolon) nil
+(envOpts stopViewList) ("SimMosfetStandard" "SimDiodeStandard" "SimCpolyStandard" "SimCmetalStandard" "SimCfringeStandard" "SimCfringeAccurate" "SimResistorStandard" "SimResistorAccurate" "SimResistorHF" "SimResistorHFV" "SimBipolarStandard" "SimCmimStandard" "SimCapaStd" "SimCapaAcc" "SimMosfetAccurate" "SimMosfetrfStandard" "SimMosfetrfPSP" "SimInductorStandard" "SimInductorAccurate" "SimVaractorStandard" "SimCmomStandard" "SimCmomAccurate" "hspiceS" "hspiceD" "veriloga")
+(envOpts switchViewList) ("SimMosfetStandard" "SimDiodeStandard" "SimCpolyStandard" "SimCmetalStandard" "SimCfringeStandard" "SimCfringeAccurate" "SimResistorStandard" "SimResistorAccurate" "SimResistorHF" "SimResistorHFV" "SimBipolarStandard" "SimCmimStandard" "SimCapaStd" "SimCapaAcc" "SimMosfetAccurate" "SimMosfetrfStandard" "SimMosfetrfPSP" "SimInductorStandard" "SimInductorAccurate" "SimVaractorStandard" "SimCmomStandard" "SimCmomAccurate" "hspiceS" "hspiceD" "auCmos_sch" "cmos_sch" "cmos.sch" "ads_schematic" "schematic" "auGate_sch" "auGate.sch" "gate_sch" "gate.sch" "extracted" "veriloga")
+(envOpts userCmdLineOption) ""
+(envOpts vcoType) ""

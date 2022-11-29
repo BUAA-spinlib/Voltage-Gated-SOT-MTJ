@@ -1,0 +1,13 @@
+EVcdFile ""
+EVcdInfoFile ""
+VcdFile ""
+VcdInfoFile ""
+VectorFile nil
+allDefinitionFiles ((t "models.scs"))
+allIncludedPaths nil
+allStimulusFiles nil
+allVectorFiles nil
+definitionFiles ("models.scs")
+hlcheck "off"
+includePath ""
+stimulusFile nil
