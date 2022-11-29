@@ -1,7 +1,0 @@
-simulator lang=spectre
-parameters seedin=0
-statistics {
-  mismatch{
-    vary seedin dist=gauss std=1
-  }
-}
